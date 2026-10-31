@@ -31,11 +31,13 @@ vec4 atlasSample(sampler2D image){
 }
 `;
 
-function configure(material,metadata,transmissive) {
+function configure(material,metadata,transmissive,blended=false) {
   const result=material.clone();
   // One logical atlas material can require opaque/transmission raster variants.
   // Keeping opaque surfaces in the opaque queue preserves the refraction background.
   result.transmission=transmissive?1:0;
+  result.transparent=blended;
+  result.depthWrite=!blended;
   result.side=THREE.DoubleSide;
   result.forceSinglePass=true;
   result.userData.optimizerAtlas=metadata;
@@ -64,7 +66,7 @@ function configure(material,metadata,transmissive) {
       .replace('vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;', 'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance; if(atlasFlags>3.5)outgoingLight=diffuseColor.rgb;')
       .replace('#include <transmission_fragment>',THREE.ShaderChunk.transmission_fragment.replace('texture2D( transmissionMap, vTransmissionMapUv ).r','atlasOptical.r'));
   };
-  result.customProgramCacheKey=()=>`optimizer-atlas-v1:${Number(transmissive)}`;
+  result.customProgramCacheKey=()=>`optimizer-atlas-v1:${Number(transmissive)}:${Number(blended)}`;
   return result;
 }
 
@@ -94,11 +96,13 @@ export function optimizerAtlasPlugin(parser) {
         if(!object.geometry.getAttribute('_atlas_rect')||!object.geometry.getAttribute('_atlas_wrap'))throw new Error('Atlas geometry is missing required attributes.');
         if(!object.geometry.getAttribute('_atlas_uv_scale'))object.geometry.setAttribute('_atlas_uv_scale',new THREE.Float32BufferAttribute(new Float32Array(object.geometry.getAttribute('position').count*2).fill(1),2));
         const transmissive=!!extras.optimizerTransmission;
+        const blended=!!extras.optimizerBlend;
+        const variant=Number(transmissive)+2*Number(blended);
         const key=materialIndex??original;
         let cached=variants.get(key);
         if(!cached){cached=new Map();variants.set(key,cached);}
-        if(!cached.has(transmissive))cached.set(transmissive,configure(original,info,transmissive));
-        object.material=cached.get(transmissive);
+        if(!cached.has(variant))cached.set(variant,configure(original,info,transmissive,blended));
+        object.material=cached.get(variant);
       });
       gltf.userData.optimizerAtlas={logicalMaterials:metadata.size,rasterVariants:[...variants.values()].reduce((sum,map)=>sum+map.size,0)};
     },

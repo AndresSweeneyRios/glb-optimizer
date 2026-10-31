@@ -73,7 +73,6 @@ export async function bakeMaterialAtlases(document:Document,prepared:Prepared,co
     return layout;
   });
   for(const material of sources) {
-    if(material.getAlphaMode()==='BLEND')throw new Error(`Alpha blending needs a separate render-state partition: ${material.getName()}`);
     const supported=['KHR_materials_specular','KHR_materials_ior','KHR_materials_transmission','KHR_materials_emissive_strength','KHR_materials_unlit'];
     for(const extension of material.listExtensions())if(!supported.includes(extension.extensionName))throw new Error(`Unsupported atlas material extension ${extension.extensionName}: ${material.getName()}`);
     const ior=material.getExtension<IOR>('KHR_materials_ior')?.getIOR()??1.5;
@@ -153,6 +152,7 @@ export async function bakeMaterialAtlases(document:Document,prepared:Prepared,co
     for(const item of prepared.primitives) {
       const descriptor=descriptors.get(item.primitive.getMaterial()!)!;
       item.transmission=descriptor.transmission;
+      item.blend=descriptor.material.getAlphaMode()==='BLEND';
       item.neon=!!descriptor.material.getExtension('KHR_materials_unlit');
       configureGeometry(item.primitive,descriptor,output.get(item.ceiling?'ceiling':item.pass)!,layout.width,layout.height,document);
     }

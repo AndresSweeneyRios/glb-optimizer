@@ -12,7 +12,7 @@ export interface StaticSceneConfig {
   camera: { box?: {center:number[];size:number[]}; environmentOversampling?:number; minimumHeight: number; maximumHeight: number; verticalFov: number; viewportHeight: number; oversampling: number; minimumDistance: number };
   textures: { tableTexelsPerMeter: number; environmentTexelsPerMeter: number; materialTexelsPerMeter?: Record<string,number>; maxSize: number; minSize: number; quality: number; jobs: number; threadsPerJob: number; basisu: string };
 }
-export interface StaticPrimitive { primitive: Primitive; pass: RenderPass; ceiling: boolean; source: string; instanceBatch?: number; transmission?: boolean; neon?: boolean }
+export interface StaticPrimitive { primitive: Primitive; pass: RenderPass; ceiling: boolean; source: string; instanceBatch?: number; transmission?: boolean; blend?: boolean; neon?: boolean }
 
 export function classifyNode(node: Node, config: StaticSceneConfig): RenderPass {
   for (let parent: Node | null = node; parent; parent = parent.getParentNode()) {
@@ -79,7 +79,7 @@ export async function mergeStaticScene(document: Document, prepared: ReturnType<
   for (const item of prepared.primitives) {
     if (item.instanceBatch !== undefined) continue;
     const primitive = item.primitive;
-    const key = JSON.stringify({ material: materials.indexOf(primitive.getMaterial()!), mode: primitive.getMode(), ceiling: item.ceiling, transmission: item.transmission??false,neon:item.neon??false,
+    const key = JSON.stringify({ material: materials.indexOf(primitive.getMaterial()!), mode: primitive.getMode(), ceiling: item.ceiling, transmission: item.transmission??false,blend:item.blend??false,blendSource:item.blend?item.source:undefined,neon:item.neon??false,
       attributes: primitive.listSemantics().toSorted().map(semantic => { const a = primitive.getAttribute(semantic)!; return [semantic,a.getType(),a.getComponentType(),a.getNormalized()]; }) });
     const group = groups[item.ceiling?'ceiling':item.pass];
     const bucket = group.get(key) ?? [];
@@ -97,7 +97,7 @@ export async function mergeStaticScene(document: Document, prepared: ReturnType<
     const mesh = document.createMesh(`${group}-merged`);
     for (const bucket of groups[group].values()) {
       const primitive = bucket.length === 1 ? bucket[0].primitive : joinPrimitives(bucket.map(item => item.primitive));
-      primitive.setExtras({optimizerPass:pass,optimizerCeiling:bucket[0].ceiling,optimizerTransmission:bucket[0].transmission??false,optimizerNeon:bucket[0].neon??false,sourceNames:[...new Set(bucket.map(item => item.source))]});
+      primitive.setExtras({optimizerPass:pass,optimizerCeiling:bucket[0].ceiling,optimizerTransmission:bucket[0].transmission??false,optimizerBlend:bucket[0].blend??false,optimizerNeon:bucket[0].neon??false,sourceNames:[...new Set(bucket.map(item => item.source))]});
       mesh.addPrimitive(primitive);
     }
     const node = document.createNode(group === 'ceiling'?'Ceiling':group).setMesh(mesh).setExtras({optimizerPass:pass,optimizerCeiling:group==='ceiling'});
