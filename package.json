@@ -1,0 +1,46 @@
+{
+  "name": "glb-optimizer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "cli": "node src/cli.ts",
+    "check": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "preview": "node src/preview-server.ts"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "draco3dgltf": "^1.5.9",
+    "meshoptimizer": "^1.3.0",
+    "sharp": "^0.35.5",
+    "webgpu": "^0.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@webgpu/types": "^0.1.74",
+    "gltf-validator": "^2.0.0-dev.3.10",
+    "ktx-parse": "^2.0.0",
+    "three": "^0.187.0",
+    "typescript": "^7.0.2"
+  },
+  "description": "Static GLB optimization with WebGPU material atlas baking, KTX2 compression, geometry merging and GPU instancing.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndresSweeneyRios/glb-optimizer.git"
+  },
+  "bin": {
+    "glb-optimizer": "src/cli.ts"
+  },
+  "exports": {
+    "./optimizer": "./src/optimizer.ts",
+    "./io": "./src/io.ts",
+    "./atlas-extension": "./src/atlas-extension.ts",
+    "./runtime/three-atlas": "./runtime/three-atlas.js"
+  }
+}

@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>GLB Optimizer — Table comparison</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#111318;color:#e8edf0;font:15px system-ui}header{padding:14px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}h1{font-size:18px;margin:0}small{color:#a5b5bf}button{background:#29353e;color:inherit;border:1px solid #627681;padding:7px 12px;border-radius:5px;cursor:pointer}main{display:grid;grid-template-columns:1fr 1fr;height:calc(100dvh - 100px)}section{position:relative;min-width:0;border:1px solid #29353e}canvas{width:100%;height:100%;display:block}label{position:absolute;top:12px;left:14px;background:#10151bdc;padding:8px 12px;border-radius:5px;pointer-events:none}footer{padding:10px 20px;color:#a5b5bf}#status{color:#bed4b9}@media(max-width:650px){main{grid-template-columns:1fr;height:80dvh;grid-template-rows:1fr 1fr}}
+</style>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script>
+<header><h1>Table GLB comparison</h1><button id="reset">Reset camera</button><button id="ceiling">Show ceiling</button><span id="status">Loading both models…</span></header>
+<main><section><label>Original · 24.18 MB</label><canvas id="original"></canvas></section><section><label>Optimized · 23.70 MB · −2.0%</label><canvas id="optimized"></canvas></section></main>
+<footer>Drag either view to orbit · Right-drag to pan · Scroll to zoom · Same lighting and camera in both views. Raw exported geometry; game-specific repairs/effects are not applied.</footer>
+<script type="module" src="/preview/main.js"></script></html>

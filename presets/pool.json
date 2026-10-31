@@ -1,0 +1,39 @@
+{
+  "tableNames": [
+    "frame",
+    "surface",
+    "cue_ball_placement",
+    "poolleg"
+  ],
+  "tablePrefixes": [
+    "pocket"
+  ],
+  "camera": {
+    "minimumHeight": 0.25,
+    "maximumHeight": 3.0,
+    "verticalFov": 42,
+    "viewportHeight": 1080,
+    "oversampling": 1,
+    "minimumDistance": 0.25
+  },
+  "textures": {
+    "tableTexelsPerMeter": 512,
+    "environmentTexelsPerMeter": 256,
+    "maxSize": 1024,
+    "minSize": 32,
+    "quality": 175,
+    "jobs": 3,
+    "threadsPerJob": 4,
+    "basisu": "basisu"
+  },
+  "instancing": {
+    "enabled": true,
+    "minInstances": 3,
+    "minSavedVertices": 256
+  },
+  "atlas": {
+    "enabled": true,
+    "padding": 16,
+    "maxSize": 2048
+  }
+}
