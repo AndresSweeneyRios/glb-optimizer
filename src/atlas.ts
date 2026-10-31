@@ -14,15 +14,15 @@ export function packAtlas(tiles: AtlasTile[], { padding = 16, maxSize = 4096 } =
   }
   const sorted = tiles.toSorted((a, b) => b.height - a.height || b.width - a.width || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const regions: AtlasRegion[] = [];
-  let x = 0, y = 0, rowHeight = 0, width = 1;
-  for (const tile of sorted) {
-    const w = tile.width + 2 * padding, h = tile.height + 2 * padding;
-    if (x + w > maxSize) { x = 0; y += rowHeight; rowHeight = 0; }
-    if (y + h > maxSize) throw new Error('Atlas overflow; use multiple pages or increase maxSize.');
-    regions.push({ ...tile, x: x + padding, y: y + padding, padding });
-    x += w; rowHeight = Math.max(rowHeight, h); width = Math.max(width, x);
+  const rows:{x:number;y:number;height:number}[]=[];
+  let y=0,width=1;
+  for(const tile of sorted){
+    const w=tile.width+2*padding,h=tile.height+2*padding;
+    let row=rows.filter(row=>h<=row.height&&row.x+w<=maxSize).toSorted((a,b)=>(maxSize-a.x-w)-(maxSize-b.x-w)||a.y-b.y)[0];
+    if(!row){if(y+h>maxSize)throw new Error('Atlas overflow; use multiple pages or increase maxSize.');row={x:0,y,height:h};rows.push(row);y+=h;}
+    regions.push({...tile,x:row.x+padding,y:row.y+padding,padding});row.x+=w;width=Math.max(width,row.x);
   }
-  return { width, height: Math.max(1, y + rowHeight), regions };
+  return { width, height: Math.max(1, y), regions };
 }
 
 /** Mirror with repeated edge texels, including when padding exceeds tile size. */

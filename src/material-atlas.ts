@@ -2,11 +2,12 @@ import sharp from 'sharp';
 import {type Document, type Material, type Texture, type TextureInfo} from '@gltf-transform/core';
 import {KHRMaterialsSpecular, KHRMaterialsTransmission, KHRMaterialsEmissiveStrength, type Specular, type Transmission, type IOR, type EmissiveStrength, type Transform} from '@gltf-transform/extensions';
 import {packAtlas,type AtlasRegion} from './atlas.ts';
+import {splitUVCharts} from './uv-charts.ts';
 import {createAtlasGPU} from './atlas-gpu.ts';
 import {OptimizerAtlasExtension,ATLAS_EXTENSION} from './atlas-extension.ts';
 import {planTextureSizes} from './texel-density.ts';
 import {textureBindings,type StaticSceneConfig,prepareStaticScene} from './static-scene.ts';
-import {transformMesh} from '@gltf-transform/functions';
+import {joinPrimitives,transformMesh} from '@gltf-transform/functions';
 
 type Prepared=ReturnType<typeof prepareStaticScene>;
 interface UVLayout {texCoord:number;scale:number[];offset:number[];rotation:number;wrapS:number;wrapT:number}
@@ -23,11 +24,13 @@ function configureGeometry(primitive:import('@gltf-transform/core').Primitive,de
   const uv=new Float32Array(count*2),rect=new Float32Array(count*4),wrap=new Float32Array(count*2);
   const {region,uv:layout}=descriptor;
   const c=Math.cos(layout.rotation),s=Math.sin(layout.rotation);
+  const crop=descriptor.material.getExtras().optimizerUVRect as number[]|undefined;
   for(let i=0;i<count;i++) {
     const point=source?.getElement(i,[])??[0.5,0.5];
     uv.set([layout.offset[0]+c*point[0]*layout.scale[0]-s*point[1]*layout.scale[1],layout.offset[1]+s*point[0]*layout.scale[0]+c*point[1]*layout.scale[1]],i*2);
+    if(crop){uv[i*2]=(uv[i*2]-crop[0])/crop[2];uv[i*2+1]=(uv[i*2+1]-crop[1])/crop[3];}
     rect.set([region.x/width,region.y/height,region.width/width,region.height/height],i*4);
-    wrap.set([wrapMode(layout.wrapS),wrapMode(layout.wrapT)],i*2);
+    wrap.set(crop?[2,2]:[wrapMode(layout.wrapS),wrapMode(layout.wrapT)],i*2);
   }
   // All merged streams share one layout. Source tangents are regenerated in the shader
   // from the unwrapped, transformed UV set used to sample the normal map.
@@ -49,11 +52,17 @@ export async function bakeMaterialAtlases(document:Document,prepared:Prepared,co
     if(!metadata.width||!metadata.height)throw new Error('Missing source image dimensions.');
     dimensions.set(texture,{width:metadata.width,height:metadata.height});
   }
-  const sizes=planTextureSizes(prepared.primitives,dimensions,prepared.cameraBounds,config);
+
+  const uvCharts=splitUVCharts(document,prepared,material=>uvLayout(textureBindings(material)[0]?.info),material=>{
+    const maps=textureBindings(material);if(!maps.length)return null;
+    const sizes=maps.map(map=>dimensions.get(map.texture)!);
+    return sizes.every(size=>size.width===sizes[0].width&&size.height===sizes[0].height)?sizes[0]:null;
+  },options.padding);
   const materials=[...new Set(prepared.primitives.map(item=>item.primitive.getMaterial()))];
   if(materials.includes(null))throw new Error('Assign a material to every primitive before atlas baking.');
   const sources=materials as Material[];
   const bindings=sources.map(material=>textureBindings(material));
+  const materialSizes=sources.map(material=>planTextureSizes(prepared.primitives.filter(item=>item.primitive.getMaterial()===material),dimensions,prepared.cameraBounds,config));
   const layouts=bindings.map((maps,index)=>{
     const layout=uvLayout(maps[0]?.info);
     if(maps.some(map=>JSON.stringify(uvLayout(map.info))!==JSON.stringify(layout)))throw new Error(`Material ${sources[index].getName()} uses independent texture UV transforms. Separate-coordinate atlas baking is not supported yet.`);
@@ -69,11 +78,15 @@ export async function bakeMaterialAtlases(document:Document,prepared:Prepared,co
   }
   const tiles=sources.map((_,index)=>{
     const maps=bindings[index];
-    const width=Math.max(16,...maps.map(map=>sizes.get(map.texture)!.width));
-    const height=Math.max(16,...maps.map(map=>sizes.get(map.texture)!.height));
+    const crop=sources[index].getExtras().optimizerUVRect as number[]|undefined;
+    const width=Math.max(16,...maps.map(map=>materialSizes[index].get(map.texture)!.width*(crop?.[2]??1)));
+    const height=Math.max(16,...maps.map(map=>materialSizes[index].get(map.texture)!.height*(crop?.[3]??1)));
     return {id:String(index),width:Math.ceil(width/16)*16,height:Math.ceil(height/16)*16};
   });
-  const packed=packAtlas(tiles,{padding:options.padding,maxSize:options.maxSize});
+  let packed;
+  try {packed=packAtlas(tiles,{padding:options.padding,maxSize:options.maxSize});}
+  catch(error){throw new Error(`${String(error)} Requested tiles: ${tiles.map((tile,index)=>`${sources[index].getName()}: ${tile.width}×${tile.height}`).join(', ')}; ${uvCharts.filter(chart=>chart.usedArea<1).length} cropped materials.`);}
+
   const layout={...packed,width:Math.ceil(packed.width/16)*16,height:Math.ceil(packed.height/16)*16};
   const emission=sources.map(material=>material.getEmissiveFactor().map(value=>value*(material.getExtension<EmissiveStrength>('KHR_materials_emissive_strength')?.getEmissiveStrength()??1)));
   const emissiveScale=Math.max(1,...emission.flat());
@@ -87,9 +100,11 @@ export async function bakeMaterialAtlases(document:Document,prepared:Prepared,co
       const maps=bindings[index];
       const images=await Promise.all(slotNames.map(async slot=>{
         const map=maps.find(map=>map.slot===slot);if(!map)return null;
-        const key=`${document.getRoot().listTextures().indexOf(map.texture)}:${region.width}:${region.height}:${['baseColorTexture','emissiveTexture','specularColorTexture'].includes(slot)}`;
+        const crop=material.getExtras().optimizerUVRect as number[]|undefined;
+        const key=`${JSON.stringify(crop)}:${document.getRoot().listTextures().indexOf(map.texture)}:${region.width}:${region.height}:${['baseColorTexture','emissiveTexture','specularColorTexture'].includes(slot)}`;
         if(!decoded.has(key))decoded.set(key,(async()=>{
           let image=sharp(map.texture.getImage()!);
+          if(crop){const source=dimensions.get(map.texture)!;image=image.extract({left:Math.round(crop[0]*source.width),top:Math.round(crop[1]*source.height),width:Math.round(crop[2]*source.width),height:Math.round(crop[3]*source.height)});}
           if(['baseColorTexture','emissiveTexture','specularColorTexture'].includes(slot))image=image.gamma();
           return new Uint8Array(await image.resize(region.width,region.height,{fit:'fill',kernel:'lanczos3'}).ensureAlpha().raw().toBuffer());
         })());
@@ -141,8 +156,10 @@ export async function bakeMaterialAtlases(document:Document,prepared:Prepared,co
       const mesh=batch.mesh.clone();
       transformMesh(mesh,[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
       for(const primitive of mesh.listPrimitives())configureGeometry(primitive,descriptors.get(primitive.getMaterial()!)!,output.get('environment')!,layout.width,layout.height,document);
+      const primitives=mesh.listPrimitives();
+      if(primitives.length>1){const joined=joinPrimitives(primitives);for(const primitive of primitives)mesh.removePrimitive(primitive);mesh.addPrimitive(joined);}
       batch.mesh=mesh;
     }
-    return {backend:'WebGPU',adapter:gpu.adapter,materials:output.size,regions:layout.regions.length,size:[layout.width,layout.height],padding:options.padding,maxMip:Math.max(0,Math.floor(Math.log2(options.padding))-2),channels:roles.filter((_,index)=>pixels[index]),sourceTextures:dimensions.size};
+    return {backend:'WebGPU',adapter:gpu.adapter,materials:output.size,regions:layout.regions.length,size:[layout.width,layout.height],padding:options.padding,maxMip:Math.max(0,Math.floor(Math.log2(options.padding))-2),channels:roles.filter((_,index)=>pixels[index]),sourceTextures:dimensions.size,uvCharts};
   } finally {gpu.destroy();}
 }

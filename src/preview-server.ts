@@ -7,9 +7,9 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const gameAssets = '/projects/8ball/src/assets/3d';
 const aliases: Record<string,string> = {
   '/': resolve(root, 'preview/index.html'),
-  '/original.glb': resolve(gameAssets, 'table.glb'),
-  '/report.json': resolve(root, 'output/table.atlas.report.json'),
-  '/optimized.glb': resolve(root, 'output/table.atlas.glb'),
+  '/original.glb': resolve(process.env.GLB_PREVIEW_SOURCE ?? resolve(gameAssets, 'table.glb')),
+  '/report.json': resolve(process.env.GLB_PREVIEW_REPORT ?? resolve(root, 'output/table.atlas.report.json')),
+  '/optimized.glb': resolve(process.env.GLB_PREVIEW_OUTPUT ?? resolve(root, 'output/table.atlas.glb')),
   '/environment.hdr': resolve(gameAssets, 'pine_attic_1k.hdr'),
 };
 const mime: Record<string,string> = {'.html':'text/html', '.js':'text/javascript', '.wasm':'application/wasm', '.glb':'model/gltf-binary', '.json':'application/json'};

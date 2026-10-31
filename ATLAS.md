@@ -8,14 +8,14 @@ Three logical materials are named `environment`, `table`, and `ceiling`. They sh
 
 Every primitive contains `POSITION`, `NORMAL`, `TEXCOORD_0`, `_ATLAS_RECT` (four normalized interior rectangle coordinates), and `_ATLAS_WRAP` (two wrap modes: 0 repeat, 1 mirrored repeat, 2 clamp). Rectangle and wrap values are constant across a triangle. In Three.js the custom attribute names become lowercase. UVs retain their repeat range; their common source texture transform is applied to vertices before batching.
 
-Source texture slots currently must share a UV set, texture transform and wrap modes within a material. Independent per-slot mappings are rejected with a diagnostic. Vertex tangents are reconstructed in the runtime from the unwrapped transformed UVs. Source animations, skins, morphs and unsupported material extensions are rejected by this static preset.
+Useful non-repeating UV islands are cropped and packed separately; UVs are remapped to those regions, and compatible geometry is rejoined including inside instance meshes. Source texture slots currently must share a UV set, texture transform and wrap modes within a material. Independent per-slot mappings are rejected with a diagnostic. Vertex tangents are reconstructed in the runtime from the unwrapped transformed UVs. Source animations, skins, morphs and unsupported material extensions are rejected by this static preset.
 
 ## Textures
 
 - `atlas-color`: sRGB RGB with linear alpha; source base-color factors are baked in linear light.
 - `atlas-normal`: linear tangent-space XYZ encoded in RGB. Source normal scale is baked and vectors renormalized.
 - `atlas-msao`: linear **R metallic, G specular intensity, B ambient occlusion, A roughness**. Includes source scalar factors and AO strength. AO is the authored AO map, not newly ray-traced scene occlusion.
-- `atlas-optics`: linear **R transmission, G (IOR−1)/2, B flags/3, A alpha cutoff**. Flags bit 0 means normal mapping, bit 1 means double-sided. Opaque tiles use alpha cutoff zero and alpha one. IOR range is 1–3.
+- `atlas-optics`: linear **R transmission, G (IOR−1)/2, B flags/(flagsScale or 3), A alpha cutoff**. Flags bit 0 means normal mapping, bit 1 means double-sided, bit 2 means unlit. New exports use flagsScale 7; older exports default to 3. Opaque tiles use alpha cutoff zero and alpha one. IOR range is 1–3.
 
 Optional `atlas-emissive` and `atlas-specular` sRGB textures are emitted only when non-default emission/specular colors are used. Emission is normalized by a shared scale retained in the material's emissive-strength extension.
 

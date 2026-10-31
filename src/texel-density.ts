@@ -1,4 +1,5 @@
 import type { Accessor, Texture, TextureInfo } from '@gltf-transform/core';
+import {triangleBoxDistance} from './geometry-distance.ts';
 import type { Transform } from '@gltf-transform/extensions';
 import { textureBindings, type Bounds, type StaticPrimitive, type StaticSceneConfig } from './static-scene.ts';
 
@@ -40,6 +41,7 @@ export function planTextureSizes(primitives: StaticPrimitive[], dimensions: Map<
     const position = primitive.getAttribute('POSITION')!;
     const indices = primitive.getIndices();
     const count = indices?.getCount() ?? position.getCount();
+    const distanceCache:number[]=[];
     for (const {texture,info} of textureBindings(material)) {
       const size = dimensions.get(texture);
       if (!size) continue;
@@ -51,15 +53,17 @@ export function planTextureSizes(primitives: StaticPrimitive[], dimensions: Map<
         const ids = [0,1,2].map(offset => indices ? indices.getScalar(i+offset) : i+offset);
         const points = ids.map(id => read(position,id));
         const uv = ids.map(id => transformedUV(read(texcoord,id),info));
+        const footprint=Math.max(...[0,1].map(axis=>(Math.max(...uv.map(p=>p[axis]))-Math.min(...uv.map(p=>p[axis])))*(axis===0?size.width:size.height)));
+        // Float export noise around a constant UV is not texture detail demand.
+        if(footprint<0.5)continue;
         const pixelsPerMeter = trianglePixelDensity(points,uv,size.width,size.height);
         if (pixelsPerMeter < 1e-8) continue;
-        const triangleBounds = {min:[0,1,2].map(axis => Math.min(...points.map(p=>p[axis]))),max:[0,1,2].map(axis => Math.max(...points.map(p=>p[axis])))};
-        const distance = Math.max(config.camera.minimumDistance,boundsDistance(triangleBounds,cameraBounds));
+        const distance = distanceCache[i/3] ?? (distanceCache[i/3]=Math.max(config.camera.minimumDistance,triangleBoxDistance(points,cameraBounds)));
         const densityCap = pass === 'table' ? config.textures.tableTexelsPerMeter : config.textures.environmentTexelsPerMeter;
         const demand = Math.min(densityCap,config.camera.oversampling*focalPixels/distance);
         scale = Math.max(scale,Math.min(1,demand/pixelsPerMeter));
       }
-      scales.set(texture,scale || 1);
+      scales.set(texture,scale);
     }
   }
   const plans = new Map<Texture,{width:number;height:number}>();

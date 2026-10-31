@@ -30,13 +30,13 @@ The explicit **static scene preset** bakes world transforms and changes the scen
 - Removes authored-hidden geometry from this static output. The source GLB is untouched.
 - Uses the table's world-space footprint, extruded over a configurable camera-height interval, as the reachable camera volume for texture budgeting.
 - Accounts for triangle world dimensions, UV tiling, selected UV sets and `KHR_texture_transform`. Shared textures retain the highest resolution needed by their consumers; block rounding and shared usage mean the density budget is approximate.
-- Defaults to 512 texels/metre on the table and 256 in the room, capped at 1024 px, without upscaling. FOV, viewport height and distance further limit distant detail.
+- Defaults to 512 texels/metre on the table and 128 in the room, capped at 1024 px, without upscaling. FOV, viewport height and distance further limit distant detail.
 - Produces mipmapped KTX2 textures: ETC1S for sRGB color, UASTC for linear PBR data and normal maps. Preserves linear/sRGB transfer metadata and renormalizes normals during mip generation. Geometry uses Draco compression.
 - Refuses animation, skins, morph targets, pre-existing GPU instances and unsupported primitive extensions in static mode.
 
 Settings are in [presets/pool.json](presets/pool.json), including encoder path, job/thread limits and instancing thresholds. World units are assumed to be metres.
 
-The pool atlas preset currently goes from **24.18 MB to 3.01 MB**, with **three logical materials, four shared KTX2 atlases and nine geometry batches**, including five instance batches covering 35 repeated furniture parts. The ceiling starts hidden, leaving eight geometry batches visible. This is an asset-specific result, not a general compression guarantee. The game still loads its original asset; integrating the new hierarchy into the game's model setup is a separate change.
+The pool atlas preset currently goes from **about 24 MB to 1.37 MB**, with **three logical materials, four shared KTX2 atlases and merged geometry batches**, including five instance batches covering 35 repeated furniture parts. The ceiling starts hidden. This is an asset-specific result, not a general compression guarantee. The game still loads its original asset; integrating the new hierarchy into the game's model setup is a separate change.
 
 ## Preview
 
@@ -59,3 +59,5 @@ mv output/table.atlas.report.next.json output/table.atlas.report.json
 The tiled-atlas bake and WebGL2 runtime adapter are implemented; their format, channel swizzles and limitations are documented in [ATLAS.md](ATLAS.md). Independent UV transforms per texture slot, WebGPU runtime rendering, vertex-color casting and impostors remain future stages; see [DESIGN.md](DESIGN.md).
 
 Native Dawn WebGPU dispatch/readback is verified on the local RX 7700 XT using Mesa Vulkan. Atlas channel packing, factor baking and mirrored bleed run in native WebGPU compute. Image decoding/resizing/PNG serialization use Sharp; KTX2 compression uses the native Basis Universal encoder.
+
+UV preprocessing crops useful non-repeating islands, with padding-aware split costs. Real repeated tiles stay intact. Texture demand uses closest triangle-to-camera-volume distance and ignores subpixel UV export noise. Preview input/output/report paths can be overridden with `GLB_PREVIEW_SOURCE`, `GLB_PREVIEW_OUTPUT` and `GLB_PREVIEW_REPORT`.

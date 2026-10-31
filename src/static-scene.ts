@@ -114,7 +114,7 @@ export async function mergeStaticScene(document: Document, prepared: ReturnType<
     return false;
   };
   for(const extension of root.listExtensionsUsed()) {
-    if(!['KHR_materials_specular','KHR_materials_ior','KHR_materials_transmission','KHR_materials_emissive_strength','KHR_texture_transform','EXT_glb_optimizer_atlas'].includes(extension.extensionName))continue;
+    if(!['KHR_materials_specular','KHR_materials_ior','KHR_materials_transmission','KHR_materials_emissive_strength','KHR_materials_unlit','KHR_texture_transform','EXT_glb_optimizer_atlas'].includes(extension.extensionName))continue;
     for(const property of extension.listProperties())if(!isAttached(property))property.dispose();
     if(!extension.listProperties().length)extension.dispose();
   }

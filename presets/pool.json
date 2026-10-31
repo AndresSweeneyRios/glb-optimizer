@@ -18,7 +18,7 @@
   },
   "textures": {
     "tableTexelsPerMeter": 512,
-    "environmentTexelsPerMeter": 256,
+    "environmentTexelsPerMeter": 128,
     "maxSize": 1024,
     "minSize": 32,
     "quality": 175,
