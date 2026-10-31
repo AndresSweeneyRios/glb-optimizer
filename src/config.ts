@@ -23,5 +23,6 @@ export async function readStaticConfig(path: string): Promise<StaticSceneConfig>
     check('atlas','padding',16,256,true);check('atlas','maxSize',64,4096,true);
     if((value.atlas.padding&(value.atlas.padding-1)) || value.atlas.maxSize%16)throw new Error('Atlas padding must be a power of two; maxSize must be divisible by 16.');
   }
+  if(value.textures.materialTexelsPerMeter!==undefined && (!value.textures.materialTexelsPerMeter || typeof value.textures.materialTexelsPerMeter!=='object' || Array.isArray(value.textures.materialTexelsPerMeter) || Object.values(value.textures.materialTexelsPerMeter).some(n=>typeof n!=='number'||!Number.isFinite(n)||n<1||n>16384)))throw new Error('Invalid per-material texel density budget.');
   return value as StaticSceneConfig;
 }

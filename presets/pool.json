@@ -24,7 +24,11 @@
     "quality": 175,
     "jobs": 3,
     "threadsPerJob": 4,
-    "basisu": "basisu"
+    "basisu": "basisu",
+    "materialTexelsPerMeter": {
+      "floormat": 256,
+      "walls": 256
+    }
   },
   "instancing": {
     "enabled": true,

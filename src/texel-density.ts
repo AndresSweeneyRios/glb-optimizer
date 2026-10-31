@@ -59,7 +59,8 @@ export function planTextureSizes(primitives: StaticPrimitive[], dimensions: Map<
         const pixelsPerMeter = trianglePixelDensity(points,uv,size.width,size.height);
         if (pixelsPerMeter < 1e-8) continue;
         const distance = distanceCache[i/3] ?? (distanceCache[i/3]=Math.max(config.camera.minimumDistance,triangleBoxDistance(points,cameraBounds)));
-        const densityCap = pass === 'table' ? config.textures.tableTexelsPerMeter : config.textures.environmentTexelsPerMeter;
+        const materialName=String(material.getExtras().optimizerSourceMaterial??material.getName());
+        const densityCap = config.textures.materialTexelsPerMeter?.[materialName] ?? (pass === 'table' ? config.textures.tableTexelsPerMeter : config.textures.environmentTexelsPerMeter);
         const demand = Math.min(densityCap,config.camera.oversampling*focalPixels/distance);
         scale = Math.max(scale,Math.min(1,demand/pixelsPerMeter));
       }

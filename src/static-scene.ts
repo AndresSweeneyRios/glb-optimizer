@@ -10,7 +10,7 @@ export interface StaticSceneConfig {
   atlas?: {enabled: boolean; padding: number; maxSize: number};
   instancing?: {enabled: boolean; minInstances: number; minSavedVertices: number};
   camera: { minimumHeight: number; maximumHeight: number; verticalFov: number; viewportHeight: number; oversampling: number; minimumDistance: number };
-  textures: { tableTexelsPerMeter: number; environmentTexelsPerMeter: number; maxSize: number; minSize: number; quality: number; jobs: number; threadsPerJob: number; basisu: string };
+  textures: { tableTexelsPerMeter: number; environmentTexelsPerMeter: number; materialTexelsPerMeter?: Record<string,number>; maxSize: number; minSize: number; quality: number; jobs: number; threadsPerJob: number; basisu: string };
 }
 export interface StaticPrimitive { primitive: Primitive; pass: RenderPass; ceiling: boolean; source: string; instanceBatch?: number; transmission?: boolean; neon?: boolean }
 
