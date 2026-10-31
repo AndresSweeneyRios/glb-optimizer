@@ -15,11 +15,21 @@ export function packAtlas(tiles: AtlasTile[], { padding = 16, maxSize = 4096 } =
   }
   const sorted = tiles.toSorted((a, b) => b.height - a.height || b.width - a.width || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   if (!sorted.length) return {width:1,height:1,regions:[]};
-  const packer = new MaxRectsPacker(maxSize,maxSize,0,{smart:true,pot:false,square:false,allowRotation:false});
-  for (const tile of sorted) packer.add(tile.width+2*padding,tile.height+2*padding,tile);
-  if (packer.bins.length!==1) throw new Error('Atlas overflow; use multiple pages or increase maxSize.');
-  const regions:AtlasRegion[]=packer.rects.map(rect=>({...rect.data as AtlasTile,x:rect.x!+padding,y:rect.y!+padding,padding}));
-  return {width:Math.max(...regions.map(r=>r.x+r.width+padding)),height:Math.max(...regions.map(r=>r.y+r.height+padding)),regions};
+  let best:AtlasLayout|undefined;
+  const minimumWidth=Math.max(...sorted.map(tile=>tile.width+2*padding));
+  // Probe bounded bin widths instead of accepting a sparse, wide first fit.
+  for(let limit=minimumWidth;limit<=maxSize;limit=Math.min(maxSize,limit+64)){
+    const packer=new MaxRectsPacker(limit,maxSize,0,{smart:true,pot:false,square:false,allowRotation:false});
+    for(const tile of sorted)packer.add(tile.width+2*padding,tile.height+2*padding,tile);
+    if(packer.bins.length===1){
+      const regions:AtlasRegion[]=packer.rects.map(rect=>({...rect.data as AtlasTile,x:rect.x!+padding,y:rect.y!+padding,padding}));
+      const candidate={width:Math.max(...regions.map(r=>r.x+r.width+padding)),height:Math.max(...regions.map(r=>r.y+r.height+padding)),regions};
+      if(!best||candidate.width*candidate.height<best.width*best.height)best=candidate;
+    }
+    if(limit===maxSize)break;
+  }
+  if(!best)throw new Error('Atlas overflow; use multiple pages or increase maxSize.');
+  return best;
 }
 
 /** Mirror with repeated edge texels, including when padding exceeds tile size. */
