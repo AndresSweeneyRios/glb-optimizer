@@ -7,6 +7,7 @@ flat varying vec2 vAtlasWrap;
 varying vec2 vAtlasLocalUv;
 uniform vec2 uAtlasSize;
 uniform float uAtlasMaxMip;
+uniform float uAtlasFlagsScale;
 uniform sampler2D uAtlasColor;
 uniform sampler2D uAtlasNormal;
 uniform sampler2D uAtlasMSAO;
@@ -39,14 +40,14 @@ function configure(material,metadata,transmissive) {
   result.userData.optimizerAtlas=metadata;
   result.onBeforeCompile=shader=>{
     Object.assign(shader.uniforms,{
-      uAtlasSize:{value:new THREE.Vector2(metadata.width,metadata.height)},uAtlasMaxMip:{value:metadata.maxMip},
+      uAtlasSize:{value:new THREE.Vector2(metadata.width,metadata.height)},uAtlasMaxMip:{value:metadata.maxMip},uAtlasFlagsScale:{value:metadata.flagsScale??3},
       uAtlasColor:{value:result.map},uAtlasNormal:{value:result.normalMap},uAtlasMSAO:{value:result.roughnessMap},
       uAtlasProperties:{value:result.transmissionMap},uAtlasEmissive:{value:result.emissiveMap},uAtlasSpecular:{value:result.specularColorMap},
     });
     shader.vertexShader=`attribute vec4 _atlas_rect;\nattribute vec2 _atlas_wrap;\nflat varying vec4 vAtlasRect;\nflat varying vec2 vAtlasWrap;\nvarying vec2 vAtlasLocalUv;\n`+shader.vertexShader;
     shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>',`#include <uv_vertex>\nvAtlasRect=_atlas_rect;vAtlasWrap=_atlas_wrap;vAtlasLocalUv=uv;`);
     shader.fragmentShader=declarations+shader.fragmentShader;
-    shader.fragmentShader=shader.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );',`vec4 diffuseColor=vec4(diffuse,opacity);\nvec4 atlasPacked=atlasSample(uAtlasMSAO);\nvec4 atlasOptical=atlasSample(uAtlasProperties);\nfloat atlasFlags=floor(atlasOptical.b*3.0+0.5);\nif(!gl_FrontFacing&&floor(atlasFlags/2.0)<0.5)discard;`)
+    shader.fragmentShader=shader.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );',`vec4 diffuseColor=vec4(diffuse,opacity);\nvec4 atlasPacked=atlasSample(uAtlasMSAO);\nvec4 atlasOptical=atlasSample(uAtlasProperties);\nfloat atlasFlags=floor(atlasOptical.b*uAtlasFlagsScale+0.5);\nif(!gl_FrontFacing&&mod(floor(atlasFlags/2.0),2.0)<0.5)discard;`)
       .replace('#include <map_fragment>','diffuseColor *= atlasSample(uAtlasColor);')
       .replace('#include <alphatest_fragment>','if(diffuseColor.a<atlasOptical.a)discard;')
       .replace('#include <roughnessmap_fragment>','float roughnessFactor=atlasPacked.a;')
@@ -58,6 +59,7 @@ function configure(material,metadata,transmissive) {
         .replace('texture2D( specularIntensityMap, vSpecularIntensityMapUv ).a','atlasPacked.g')
         .replace('texture2D( specularColorMap, vSpecularColorMapUv ).rgb','atlasSample(uAtlasSpecular).rgb'))
       .replace('#include <aomap_fragment>',THREE.ShaderChunk.aomap_fragment.replace('texture2D( aoMap, vAoMapUv ).r','atlasPacked.b'))
+      .replace('vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;', 'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance; if(atlasFlags>3.5)outgoingLight=diffuseColor.rgb;')
       .replace('#include <transmission_fragment>',THREE.ShaderChunk.transmission_fragment.replace('texture2D( transmissionMap, vTransmissionMapUv ).r','atlasOptical.r'));
   };
   result.customProgramCacheKey=()=>`optimizer-atlas-v1:${Number(transmissive)}`;

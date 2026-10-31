@@ -1,7 +1,7 @@
 import { Extension, ExtensionProperty, PropertyType, type IProperty, type Nullable, type ReaderContext, type WriterContext } from '@gltf-transform/core';
 
 export const ATLAS_EXTENSION = 'EXT_glb_optimizer_atlas';
-export interface AtlasMetadata extends Record<string,unknown> { version: 1; width: number; height: number; padding: number; maxMip: number; emissiveScale: number }
+export interface AtlasMetadata extends Record<string,unknown> { version: 1; flagsScale?: number; width: number; height: number; padding: number; maxMip: number; emissiveScale: number }
 interface IAtlas extends IProperty { metadata: AtlasMetadata }
 export class AtlasMaterial extends ExtensionProperty<IAtlas> {
   static EXTENSION_NAME = ATLAS_EXTENSION;
