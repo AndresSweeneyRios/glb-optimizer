@@ -1,9 +1,10 @@
+import {MaxRectsPacker} from 'maxrects-packer';
 /** Rectangles include padding. Coordinates and dimensions are integer texels. */
 export interface AtlasTile { id: string; width: number; height: number }
 export interface AtlasRegion extends AtlasTile { x: number; y: number; padding: number }
 export interface AtlasLayout { width: number; height: number; regions: AtlasRegion[] }
 
-/** Stable shelf packing; intentionally simple baseline before measuring better packers. */
+/** Stable two-dimensional packing; tiles remain unrotated for tangent-space normals. */
 export function packAtlas(tiles: AtlasTile[], { padding = 16, maxSize = 4096 } = {}): AtlasLayout {
   if (!Number.isSafeInteger(padding) || padding < 0 || !Number.isSafeInteger(maxSize) || maxSize < 1) throw new Error('Invalid atlas limits.');
   const ids = new Set<string>();
@@ -13,16 +14,12 @@ export function packAtlas(tiles: AtlasTile[], { padding = 16, maxSize = 4096 } =
     if (![tile.width, tile.height].every(n => Number.isSafeInteger(n) && n > 0 && n + 2 * padding <= maxSize)) throw new Error(`Tile does not fit: ${tile.id}`);
   }
   const sorted = tiles.toSorted((a, b) => b.height - a.height || b.width - a.width || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const regions: AtlasRegion[] = [];
-  const rows:{x:number;y:number;height:number}[]=[];
-  let y=0,width=1;
-  for(const tile of sorted){
-    const w=tile.width+2*padding,h=tile.height+2*padding;
-    let row=rows.filter(row=>h<=row.height&&row.x+w<=maxSize).toSorted((a,b)=>(maxSize-a.x-w)-(maxSize-b.x-w)||a.y-b.y)[0];
-    if(!row){if(y+h>maxSize)throw new Error('Atlas overflow; use multiple pages or increase maxSize.');row={x:0,y,height:h};rows.push(row);y+=h;}
-    regions.push({...tile,x:row.x+padding,y:row.y+padding,padding});row.x+=w;width=Math.max(width,row.x);
-  }
-  return { width, height: Math.max(1, y), regions };
+  if (!sorted.length) return {width:1,height:1,regions:[]};
+  const packer = new MaxRectsPacker(maxSize,maxSize,0,{smart:true,pot:false,square:false,allowRotation:false});
+  for (const tile of sorted) packer.add(tile.width+2*padding,tile.height+2*padding,tile);
+  if (packer.bins.length!==1) throw new Error('Atlas overflow; use multiple pages or increase maxSize.');
+  const regions:AtlasRegion[]=packer.rects.map(rect=>({...rect.data as AtlasTile,x:rect.x!+padding,y:rect.y!+padding,padding}));
+  return {width:Math.max(...regions.map(r=>r.x+r.width+padding)),height:Math.max(...regions.map(r=>r.y+r.height+padding)),regions};
 }
 
 /** Mirror with repeated edge texels, including when padding exceeds tile size. */

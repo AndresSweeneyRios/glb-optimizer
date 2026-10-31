@@ -4,6 +4,7 @@ export const ATLAS_EXTENSION='EXT_glb_optimizer_atlas';
 const declarations=`
 flat varying vec4 vAtlasRect;
 flat varying vec2 vAtlasWrap;
+flat varying vec2 vAtlasUVScale;
 varying vec2 vAtlasLocalUv;
 uniform vec2 uAtlasSize;
 uniform float uAtlasMaxMip;
@@ -44,14 +45,15 @@ function configure(material,metadata,transmissive) {
       uAtlasColor:{value:result.map},uAtlasNormal:{value:result.normalMap},uAtlasMSAO:{value:result.roughnessMap},
       uAtlasProperties:{value:result.transmissionMap},uAtlasEmissive:{value:result.emissiveMap},uAtlasSpecular:{value:result.specularColorMap},
     });
-    shader.vertexShader=`attribute vec4 _atlas_rect;\nattribute vec2 _atlas_wrap;\nflat varying vec4 vAtlasRect;\nflat varying vec2 vAtlasWrap;\nvarying vec2 vAtlasLocalUv;\n`+shader.vertexShader;
-    shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>',`#include <uv_vertex>\nvAtlasRect=_atlas_rect;vAtlasWrap=_atlas_wrap;vAtlasLocalUv=uv;`);
+    shader.vertexShader=`attribute vec4 _atlas_rect;\nattribute vec2 _atlas_wrap;\nattribute vec2 _atlas_uv_scale;\nflat varying vec4 vAtlasRect;\nflat varying vec2 vAtlasWrap;\nflat varying vec2 vAtlasUVScale;\nvarying vec2 vAtlasLocalUv;\n`+shader.vertexShader;
+    shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>',`#include <uv_vertex>\nvAtlasRect=_atlas_rect;vAtlasWrap=_atlas_wrap;vAtlasUVScale=_atlas_uv_scale;vAtlasLocalUv=uv;`);
     shader.fragmentShader=declarations+shader.fragmentShader;
     shader.fragmentShader=shader.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );',`vec4 diffuseColor=vec4(diffuse,opacity);\nvec4 atlasPacked=atlasSample(uAtlasMSAO);\nvec4 atlasOptical=atlasSample(uAtlasProperties);\nfloat atlasFlags=floor(atlasOptical.b*uAtlasFlagsScale+0.5);\nif(!gl_FrontFacing&&mod(floor(atlasFlags/2.0),2.0)<0.5)discard;`)
       .replace('#include <map_fragment>','diffuseColor *= atlasSample(uAtlasColor);')
       .replace('#include <alphatest_fragment>','if(diffuseColor.a<atlasOptical.a)discard;')
       .replace('#include <roughnessmap_fragment>','float roughnessFactor=atlasPacked.a;')
       .replace('#include <metalnessmap_fragment>','float metalnessFactor=atlasPacked.r;')
+      .replace('#include <normal_fragment_begin>',THREE.ShaderChunk.normal_fragment_begin.replaceAll('vNormalMapUv','(vAtlasLocalUv * vAtlasUVScale)'))
       .replace('#include <normal_fragment_maps>',`if(mod(atlasFlags,2.0)>0.5){vec3 mapN=atlasSample(uAtlasNormal).xyz*2.0-1.0;normal=normalize(tbn*mapN);}`)
       .replace('#include <emissivemap_fragment>',result.emissiveMap?'totalEmissiveRadiance *= atlasSample(uAtlasEmissive).rgb;':'')
       .replace('#include <lights_physical_fragment>',THREE.ShaderChunk.lights_physical_fragment
@@ -90,6 +92,7 @@ export function optimizerAtlasPlugin(parser) {
         const info=metadata.get(original)??parser.json.materials[materialIndex]?.extensions?.[ATLAS_EXTENSION];
         if(!info)return;
         if(!object.geometry.getAttribute('_atlas_rect')||!object.geometry.getAttribute('_atlas_wrap'))throw new Error('Atlas geometry is missing required attributes.');
+        if(!object.geometry.getAttribute('_atlas_uv_scale'))object.geometry.setAttribute('_atlas_uv_scale',new THREE.Float32BufferAttribute(new Float32Array(object.geometry.getAttribute('position').count*2).fill(1),2));
         const transmissive=!!extras.optimizerTransmission;
         const key=materialIndex??original;
         let cached=variants.get(key);

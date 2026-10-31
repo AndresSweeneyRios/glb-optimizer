@@ -24,5 +24,10 @@ export async function readStaticConfig(path: string): Promise<StaticSceneConfig>
     if((value.atlas.padding&(value.atlas.padding-1)) || value.atlas.maxSize%16)throw new Error('Atlas padding must be a power of two; maxSize must be divisible by 16.');
   }
   if(value.textures.materialTexelsPerMeter!==undefined && (!value.textures.materialTexelsPerMeter || typeof value.textures.materialTexelsPerMeter!=='object' || Array.isArray(value.textures.materialTexelsPerMeter) || Object.values(value.textures.materialTexelsPerMeter).some(n=>typeof n!=='number'||!Number.isFinite(n)||n<1||n>16384)))throw new Error('Invalid per-material texel density budget.');
+  if(value.camera.environmentOversampling!==undefined)check('camera','environmentOversampling',0.1,8);
+  if(value.camera.box!==undefined){
+    const box=value.camera.box;
+    if(!box||!Array.isArray(box.center)||!Array.isArray(box.size)||box.center.length!==3||box.size.length!==3||box.center.some((v:unknown)=>typeof v!=='number'||!Number.isFinite(v))||box.size.some((v:unknown)=>typeof v!=='number'||!Number.isFinite(v)||v<=0))throw new Error('Camera box requires finite center and positive size vectors.');
+  }
   return value as StaticSceneConfig;
 }

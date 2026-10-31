@@ -17,6 +17,7 @@
     "@gltf-transform/extensions": "^4.5.1",
     "@gltf-transform/functions": "^4.5.1",
     "draco3dgltf": "^1.5.9",
+    "maxrects-packer": "^3.0.0",
     "meshoptimizer": "^1.3.0",
     "sharp": "^0.35.5",
     "webgpu": "^0.6.2"

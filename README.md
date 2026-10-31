@@ -28,15 +28,15 @@ The explicit **static scene preset** bakes world transforms and changes the scen
 - Bakes source colors and metallic/specular/AO/roughness/normal/optical properties into shared atlases and palette tiles using native WebGPU compute. Joins geometry around three logical materials. The required private atlas shader preserves tiling; glass keeps a separate transmission geometry batch.
 - Optionally keeps repeated opaque furniture as `EXT_mesh_gpu_instancing` batches beneath the environment node. Detects both shared source meshes and exact duplicate meshes. Rejects mirrored/sheared transforms for instancing, and keeps transparent/transmissive materials in ordinary batches.
 - Removes authored-hidden geometry from this static output. The source GLB is untouched.
-- Uses the table's world-space footprint, extruded over a configurable camera-height interval, as the reachable camera volume for texture budgeting.
+- Uses a configurable camera box relative to the table center and surface height. The pool preset uses a 0.4×0.8×0.4 m box above the center; a full-footprint height interval remains available when no box is specified.
 - Accounts for triangle world dimensions, UV tiling, selected UV sets and `KHR_texture_transform`. Shared textures retain the highest resolution needed by their consumers; block rounding and shared usage mean the density budget is approximate.
-- Defaults to 512 texels/metre on the table and 128 in the room, capped at 1024 px, without upscaling. FOV, viewport height and distance further limit distant detail.
+- Defaults to 512 texels/metre on the table and 128 in the room, capped at 1024 px, without upscaling. FOV, viewport height and exact triangle-to-camera-box distance further limit distant detail. Ordinary room props use 0.5 projected oversampling; explicit floor/wall density overrides retain the full projection budget.
 - Produces mipmapped KTX2 textures: ETC1S for sRGB color, UASTC for linear PBR data and normal maps. Preserves linear/sRGB transfer metadata and renormalizes normals during mip generation. Geometry uses Draco compression.
 - Refuses animation, skins, morph targets, pre-existing GPU instances and unsupported primitive extensions in static mode.
 
 Settings are in [presets/pool.json](presets/pool.json), including encoder path, job/thread limits and instancing thresholds. World units are assumed to be metres.
 
-The pool atlas preset currently goes from **about 24 MB to 1.37 MB**, with **three logical materials, four shared KTX2 atlases and merged geometry batches**, including five instance batches covering 35 repeated furniture parts. The ceiling starts hidden. This is an asset-specific result, not a general compression guarantee. The game still loads its original asset; integrating the new hierarchy into the game's model setup is a separate change.
+The pool atlas preset currently goes from **about 24 MB to 1.49 MB**, with **three logical materials, four shared KTX2 atlases and merged geometry batches**, including five instance batches covering 35 repeated furniture parts. The ceiling starts hidden. This is an asset-specific result, not a general compression guarantee. The game integrates this format in both its WebGL and native WebGPU renderers.
 
 ## Preview
 
@@ -60,4 +60,4 @@ The tiled-atlas bake and WebGL2 runtime adapter are implemented; their format, c
 
 Native Dawn WebGPU dispatch/readback is verified on the local RX 7700 XT using Mesa Vulkan. Atlas channel packing, factor baking and mirrored bleed run in native WebGPU compute. Image decoding/resizing/PNG serialization use Sharp; KTX2 compression uses the native Basis Universal encoder.
 
-UV preprocessing crops useful non-repeating islands, with padding-aware split costs. Real repeated tiles stay intact. Texture demand uses closest triangle-to-camera-volume distance and ignores subpixel UV export noise. Preview input/output/report paths can be overridden with `GLB_PREVIEW_SOURCE`, `GLB_PREVIEW_OUTPUT` and `GLB_PREVIEW_REPORT`.
+UV preprocessing rasterizes used regions on WebGPU, clips triangles at patch boundaries, and remaps UVs to the extracted patches. Padding-aware partitioning avoids spending more bleed pixels than it saves, and MaxRects packs the resulting rectangles in two dimensions. Real repeated tiles stay intact. Texture demand uses closest triangle-to-camera-volume distance and ignores subpixel UV export noise. Preview input/output/report paths can be overridden with `GLB_PREVIEW_SOURCE`, `GLB_PREVIEW_OUTPUT` and `GLB_PREVIEW_REPORT`.

@@ -7,6 +7,7 @@ import {boundsDistance,trianglePixelDensity,planTextureSizes} from '../src/texel
 import {readStaticConfig} from '../src/config.ts';
 
 const config = await readStaticConfig(new URL('../presets/pool.json',import.meta.url).pathname);
+delete config.camera.box;
 function fixture() {
   const doc = new Document(), buffer = doc.createBuffer();
   const texture = doc.createTexture('tile');

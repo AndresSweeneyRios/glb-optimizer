@@ -14,7 +14,20 @@
     "verticalFov": 42,
     "viewportHeight": 1080,
     "oversampling": 1,
-    "minimumDistance": 0.25
+    "minimumDistance": 0.25,
+    "box": {
+      "center": [
+        0,
+        0.8,
+        0
+      ],
+      "size": [
+        0.4,
+        0.8,
+        0.4
+      ]
+    },
+    "environmentOversampling": 0.5
   },
   "textures": {
     "tableTexelsPerMeter": 512,

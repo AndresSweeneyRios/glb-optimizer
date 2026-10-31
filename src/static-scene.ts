@@ -9,7 +9,7 @@ export interface StaticSceneConfig {
   tablePrefixes: string[];
   atlas?: {enabled: boolean; padding: number; maxSize: number};
   instancing?: {enabled: boolean; minInstances: number; minSavedVertices: number};
-  camera: { minimumHeight: number; maximumHeight: number; verticalFov: number; viewportHeight: number; oversampling: number; minimumDistance: number };
+  camera: { box?: {center:number[];size:number[]}; environmentOversampling?:number; minimumHeight: number; maximumHeight: number; verticalFov: number; viewportHeight: number; oversampling: number; minimumDistance: number };
   textures: { tableTexelsPerMeter: number; environmentTexelsPerMeter: number; materialTexelsPerMeter?: Record<string,number>; maxSize: number; minSize: number; quality: number; jobs: number; threadsPerJob: number; basisu: string };
 }
 export interface StaticPrimitive { primitive: Primitive; pass: RenderPass; ceiling: boolean; source: string; instanceBatch?: number; transmission?: boolean; neon?: boolean }
@@ -60,10 +60,14 @@ export function prepareStaticScene(document: Document, config: StaticSceneConfig
     mesh.dispose();
   }
   if (!tableBounds.min.every(Number.isFinite)) throw new Error('No table geometry matched the configured names.');
-  const cameraBounds = {
+  let cameraBounds = {
     min: [tableBounds.min[0], tableBounds.max[1] + config.camera.minimumHeight, tableBounds.min[2]],
     max: [tableBounds.max[0], tableBounds.max[1] + config.camera.maximumHeight, tableBounds.max[2]],
   };
+  if(config.camera.box){
+    const origin=[(tableBounds.min[0]+tableBounds.max[0])/2,tableBounds.max[1],(tableBounds.min[2]+tableBounds.max[2])/2];
+    cameraBounds={min:origin.map((value,index)=>value+config.camera.box!.center[index]-config.camera.box!.size[index]/2),max:origin.map((value,index)=>value+config.camera.box!.center[index]+config.camera.box!.size[index]/2)};
+  }
   return {primitives, tableBounds, cameraBounds, sourceNodes, removedHidden, instances};
 }
 

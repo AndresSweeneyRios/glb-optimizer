@@ -6,9 +6,9 @@
 
 Three logical materials are named `environment`, `table`, and `ceiling`. They share the same four KTX2 atlases. Constant materials occupy small 16×16 palette tiles; textured materials occupy density-budgeted tiles. A repeated wall/floor texture is represented once per material tile, without baking its repeated copies across geometry.
 
-Every primitive contains `POSITION`, `NORMAL`, `TEXCOORD_0`, `_ATLAS_RECT` (four normalized interior rectangle coordinates), and `_ATLAS_WRAP` (two wrap modes: 0 repeat, 1 mirrored repeat, 2 clamp). Rectangle and wrap values are constant across a triangle. In Three.js the custom attribute names become lowercase. UVs retain their repeat range; their common source texture transform is applied to vertices before batching.
+Every primitive contains `POSITION`, `NORMAL`, `TEXCOORD_0`, `_ATLAS_RECT` (four normalized interior rectangle coordinates), `_ATLAS_UV_SCALE` (the original UV span of a cropped patch), and `_ATLAS_WRAP` (two wrap modes: 0 repeat, 1 mirrored repeat, 2 clamp). Rectangle and wrap values are constant across a triangle. In Three.js the custom attribute names become lowercase. UVs retain their repeat range; their common source texture transform is applied to vertices before batching.
 
-Useful non-repeating UV islands are cropped and packed separately; UVs are remapped to those regions, and compatible geometry is rejoined including inside instance meshes. Source texture slots currently must share a UV set, texture transform and wrap modes within a material. Independent per-slot mappings are rejected with a diagnostic. Vertex tangents are reconstructed in the runtime from the unwrapped transformed UVs. Source animations, skins, morphs and unsupported material extensions are rejected by this static preset.
+Non-repeating UV coverage is rasterized conservatively on WebGPU. A padding-aware guillotine partition cuts out useful patches, including unused interiors of connected islands. Triangles crossing patch boundaries are clipped with barycentric attribute interpolation; UVs are remapped to those regions, and compatible geometry is rejoined including inside instance meshes. Source texture slots currently must share a UV set, texture transform and wrap modes within a material. Independent per-slot mappings are rejected with a diagnostic. Vertex tangents are reconstructed from the original UV derivatives using `_ATLAS_UV_SCALE`, preserving normal mapping across nonuniform crops. Unrotated MaxRects packing fills two-dimensional gaps between padded tiles. Source animations, skins, morphs and unsupported material extensions are rejected by this static preset.
 
 ## Textures
 
@@ -31,7 +31,7 @@ This intentionally bounds minification to avoid unrelated tiles bleeding through
 
 There are three logical asset materials. The environment has two geometry batches sharing its material: opaque geometry and transmissive geometry, distinguished by `optimizerTransmission` primitive extras. The adapter uses opaque/transmission raster variants of the same atlas shader so opaque surfaces populate the refraction background. That is an extra render state/pass, not another set of source PBR materials or atlases. The adapter currently creates four runtime material objects for the three logical materials.
 
-Five current furniture instance batches reuse the environment atlas material. The ceiling remains a separate node and starts hidden in the comparison preview. The current asset therefore has nine geometry batches (eight with the ceiling hidden), not three draws. Renderer refraction passes may produce additional GPU submissions.
+Five current furniture instance batches reuse the environment atlas material. The ceiling remains a separate node and starts hidden in the comparison preview. The current asset therefore has ten geometry batches (nine with the ceiling hidden), not three draws. Renderer refraction passes may produce additional GPU submissions.
 
 ## Adapter usage
 
@@ -44,4 +44,4 @@ const loader = new GLTFLoader()
 const gltf = await loader.loadAsync('table.atlas.glb');
 ```
 
-The shipped adapter supports Three.js WebGL2. A WebGPU/WGSL renderer adapter, custom shadow/depth passes and full integration with the pool game's geometry repairs are future work. The optimized asset is not installed into the game by this experiment.
+The shipped adapter supports Three.js WebGL2. The pool game also implements this contract in its native WebGPU renderer and uses the optimized asset in its production export pipeline.

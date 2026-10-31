@@ -21,7 +21,7 @@ function wrapMode(value:number){if(value===10497)return 0;if(value===33648)retur
 function configureGeometry(primitive:import('@gltf-transform/core').Primitive,descriptor:Descriptor,output:Material,width:number,height:number,document:Document) {
   const count=primitive.getAttribute('POSITION')!.getCount();
   const source=primitive.getAttribute(`TEXCOORD_${descriptor.uv.texCoord}`);
-  const uv=new Float32Array(count*2),rect=new Float32Array(count*4),wrap=new Float32Array(count*2);
+  const uv=new Float32Array(count*2),rect=new Float32Array(count*4),wrap=new Float32Array(count*2),uvScale=new Float32Array(count*2);
   const {region,uv:layout}=descriptor;
   const c=Math.cos(layout.rotation),s=Math.sin(layout.rotation);
   const crop=descriptor.material.getExtras().optimizerUVRect as number[]|undefined;
@@ -30,6 +30,7 @@ function configureGeometry(primitive:import('@gltf-transform/core').Primitive,de
     uv.set([layout.offset[0]+c*point[0]*layout.scale[0]-s*point[1]*layout.scale[1],layout.offset[1]+s*point[0]*layout.scale[0]+c*point[1]*layout.scale[1]],i*2);
     if(crop){uv[i*2]=(uv[i*2]-crop[0])/crop[2];uv[i*2+1]=(uv[i*2+1]-crop[1])/crop[3];}
     rect.set([region.x/width,region.y/height,region.width/width,region.height/height],i*4);
+    uvScale.set(crop?[crop[2],crop[3]]:[1,1],i*2);
     wrap.set(crop?[2,2]:[wrapMode(layout.wrapS),wrapMode(layout.wrapT)],i*2);
   }
   // All merged streams share one layout. Source tangents are regenerated in the shader
@@ -38,6 +39,7 @@ function configureGeometry(primitive:import('@gltf-transform/core').Primitive,de
   const buffer=primitive.getAttribute('POSITION')!.getBuffer();
   primitive.setAttribute('TEXCOORD_0',document.createAccessor().setType('VEC2').setArray(uv).setBuffer(buffer));
   primitive.setAttribute('_ATLAS_RECT',document.createAccessor().setType('VEC4').setArray(rect).setBuffer(buffer));
+  primitive.setAttribute('_ATLAS_UV_SCALE',document.createAccessor().setType('VEC2').setArray(uvScale).setBuffer(buffer));
   primitive.setAttribute('_ATLAS_WRAP',document.createAccessor().setType('VEC2').setArray(wrap).setBuffer(buffer));
   if(!primitive.getAttribute('NORMAL')) throw new Error('Atlas merging requires vertex normals.');
   primitive.setMaterial(output);
@@ -53,10 +55,12 @@ export async function bakeMaterialAtlases(document:Document,prepared:Prepared,co
     dimensions.set(texture,{width:metadata.width,height:metadata.height});
   }
 
-  const uvCharts=splitUVCharts(document,prepared,material=>uvLayout(textureBindings(material)[0]?.info),material=>{
+  const uvCharts=await splitUVCharts(document,prepared,material=>uvLayout(textureBindings(material)[0]?.info),material=>{
     const maps=textureBindings(material);if(!maps.length)return null;
     const sizes=maps.map(map=>dimensions.get(map.texture)!);
-    return sizes.every(size=>size.width===sizes[0].width&&size.height===sizes[0].height)?sizes[0]:null;
+    if(!sizes.every(size=>size.width===sizes[0].width&&size.height===sizes[0].height))return null;
+    const plan=planTextureSizes(prepared.primitives.filter(item=>item.primitive.getMaterial()===material),dimensions,prepared.cameraBounds,config);
+    return {...sizes[0],targetWidth:Math.max(...maps.map(map=>plan.get(map.texture)!.width)),targetHeight:Math.max(...maps.map(map=>plan.get(map.texture)!.height))};
   },options.padding);
   const materials=[...new Set(prepared.primitives.map(item=>item.primitive.getMaterial()))];
   if(materials.includes(null))throw new Error('Assign a material to every primitive before atlas baking.');
@@ -160,6 +164,6 @@ export async function bakeMaterialAtlases(document:Document,prepared:Prepared,co
       if(primitives.length>1){const joined=joinPrimitives(primitives);for(const primitive of primitives)mesh.removePrimitive(primitive);mesh.addPrimitive(joined);}
       batch.mesh=mesh;
     }
-    return {backend:'WebGPU',adapter:gpu.adapter,materials:output.size,regions:layout.regions.length,size:[layout.width,layout.height],padding:options.padding,maxMip:Math.max(0,Math.floor(Math.log2(options.padding))-2),channels:roles.filter((_,index)=>pixels[index]),sourceTextures:dimensions.size,uvCharts};
+    return {backend:'WebGPU',adapter:gpu.adapter,materials:output.size,regions:layout.regions.length,size:[layout.width,layout.height],padding:options.padding,maxMip:Math.max(0,Math.floor(Math.log2(options.padding))-2),channels:roles.filter((_,index)=>pixels[index]),sourceTextures:dimensions.size,uvCharts,patches:layout.regions.map(region=>({material:sources[Number(region.id)].getName(),sourceMaterial:sources[Number(region.id)].getExtras().optimizerSourceMaterial??sources[Number(region.id)].getName(),sourceUV:sources[Number(region.id)].getExtras().optimizerUVRect??[0,0,1,1],x:region.x,y:region.y,width:region.width,height:region.height}))};
   } finally {gpu.destroy();}
 }
